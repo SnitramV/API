@@ -1,0 +1,65 @@
+Excelente pergunta\! Você já tem tudo o que precisa para criar um. O processo é intencionalmente separado em duas etapas: primeiro você se registra, depois você faz login para **receber** o token.
+
+Você usará a própria documentação interativa da sua API para fazer isso. É o método mais fácil e visual.
+
+-----
+
+### **Passo a Passo para Gerar e Usar seu Token**
+
+Siga exatamente estes passos na sua página de documentação ([http://localhost:3000/api-docs](https://www.google.com/search?q=http://localhost:3000/api-docs)).
+
+#### **Passo 1: Registrar um Novo Usuário**
+
+Antes de fazer login, você precisa ter uma conta.
+
+1.  Encontre a rota **`POST /auth/register`** e clique para expandi-la.
+2.  Clique no botão **`Try it out`**.
+3.  No campo **`Request body`**, edite o JSON com um e-mail e senha que você queira usar.
+    ```json
+    {
+      "email": "meu-teste@email.com",
+      "password": "senhaforte123",
+      "name": "Meu Nome de Teste"
+    }
+    ```
+4.  Clique no grande botão azul **`Execute`**.
+
+Se tudo der certo, você receberá uma resposta com o código **201**, confirmando que o usuário foi criado.
+
+#### **Passo 2: Fazer Login para Obter o Token**
+
+Agora que o usuário existe, vamos fazer o login para que a API nos dê o nosso "cartão de membro".
+
+1.  Encontre a rota **`POST /auth/login`** e a expanda.
+2.  Clique em **`Try it out`**.
+3.  No campo **`Request body`**, preencha **exatamente o mesmo `email` e `password`** que você acabou de registrar.
+    ```json
+    {
+      "email": "meu-teste@email.com",
+      "password": "senhaforte123"
+    }
+    ```
+4.  Clique em **`Execute`**.
+
+#### **Passo 3: Copiar o Bearer Token**
+
+Se o login for bem-sucedido (código 200), olhe na seção **`Response body`**. Você verá uma resposta parecida com esta:
+
+```json
+{
+  "message": "Login bem-sucedido.",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjE3MjBlNjg1LWU0ZTgtNGYyYS04NjJkLWQyNjBkMmMxNTc3ZCIsImlhdCI6MTY3OTgzNzM0NywiZXhwIjoxNjc5ODQ0NTQ3fQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+}
+```
+
+**Este valor dentro do campo `"token"` é o seu Bearer Token\!** Copie toda essa sequência de caracteres (começando com `eyJ...`).
+
+#### **Passo 4: Autorizar suas Requisições**
+
+Agora que você tem o token, vamos "dizer" ao Swagger para usá-lo em todas as futuras requisições.
+
+1.  Vá para o topo da página e clique no botão verde **`Authorize`**.
+2.  Uma janela vai se abrir. No campo **`Value`**, cole o token que você copiou.
+3.  Clique em **`Authorize`** na janela e depois em **`Close`**.
+
+Pronto\! Agora o cadeado (🔒) ao lado de cada rota deve aparecer "fechado". Você pode ir em qualquer outra rota protegida (como `GET /api/users/profile`), clicar em `Try it out` e `Execute`, e a API irá te dar acesso, pois agora você está enviando o seu "cartão de membro" em todas as requisições.
