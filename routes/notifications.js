@@ -1,75 +1,57 @@
+// Ficheiro: API LIVE/routes/notifications.js (VERSÃO CORRIGIDA E MODERNIZADA)
+
 const express = require('express');
-const notificationController = require('../controllers/notificationController');
-const { verifyFirebaseToken } = require('../middleware/authMiddleware');
-const { checkRole } = require('../middleware/roleMiddleware');
-const {
-  createNotificationValidator,
-} = require('../validators/notificationValidators');
+const router = express.Router();
 
-// Objeto de documentação para as rotas de notificações
-const notificationDocs = {
-  '/notifications': {
-    get: {
-      tags: ['Notifications'],
-      summary: '(Admin) Lista todas as notificações agendadas e enviadas',
-      security: [{ bearerAuth: [] }],
-      responses: {
-        '200': { description: 'Lista de notificações.' },
-        '403': { description: 'Acesso negado.' },
-      },
-    },
-    post: {
-      tags: ['Notifications'],
-      summary: '(Admin) Agenda uma nova notificação (Push e/ou WhatsApp)',
-      security: [{ bearerAuth: [] }],
-      requestBody: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                name: { type: 'string', description: 'Um nome interno para a notificação.' },
-                botContent: { type: 'string', description: 'O conteúdo a ser enviado para o WhatsApp.' },
-                appContent: {
-                  type: 'object',
-                  properties: {
-                    title: { type: 'string' },
-                    body: { type: 'string' },
-                  },
-                },
-                targetGroups: { type: 'array', items: { type: 'string' }, description: 'Lista de IDs de grupos do WhatsApp para enviar a mensagem.' },
-                scheduledAt: { type: 'string', format: 'date-time', description: 'A data e hora para enviar a notificação (formato ISO 8601).' },
-                repeats: { type: 'string', enum: ['once', 'weekly'], description: 'Frequência de repetição.' },
-              },
+// Importar o controlador e os middlewares necessários
+const { createNotification, listNotifications } = require('../controllers/notificationController');
+const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
+
+// Aplica a verificação de admin a todas as rotas deste ficheiro
+router.use(authMiddleware);
+router.use(adminMiddleware);
+
+
+// --- DEFINIÇÃO DAS ROTAS DE NOTIFICAÇÕES ---
+
+// Rota para listar todas as notificações agendadas
+router.get('/', listNotifications);
+
+// Rota para criar (agendar) uma nova notificação
+router.post('/', createNotification);
+
+
+// --- DOCUMENTAÇÃO SWAGGER ---
+const docs = {
+    
+        '/notifications': {
+            get: {
+                summary: '(Admin) Lista todas as notificações',
+                tags: ['Notificações'],
+                security: [{ bearerAuth: [] }],
+                responses: { '200': { description: 'Lista de notificações' } }
             },
-          },
-        },
-      },
-      responses: {
-        '201': { description: 'Notificação agendada com sucesso.' },
-        '403': { description: 'Acesso negado.' },
-      },
-    },
-  },
+            post: {
+                summary: '(Admin) Agenda uma nova notificação',
+                tags: ['Notificações'],
+                security: [{ bearerAuth: [] }],
+                requestBody: { content: { 'application/json': { schema: { properties: {
+                    name: { type: 'string' },
+                    botContent: { type: 'string' },
+                    appContent: { type: 'string' },
+                    targetGroups: { type: 'array', items: { type: 'string' } },
+                    scheduledAt: { type: 'string', format: 'date-time' },
+                    repeats: { type: 'string' }
+                } } } } },
+                responses: { '201': { description: 'Notificação agendada' } }
+            }
+        }
+    
 };
 
-// Esta função configura o router
-const configureRouter = (router) => {
-  router.get(
-    '/',
-    [verifyFirebaseToken, checkRole(['admin'])],
-    notificationController.listNotifications
-  );
-  router.post(
-    '/',
-    [verifyFirebaseToken, checkRole(['admin'])],
-    createNotificationValidator,
-    notificationController.createNotification
-  );
-};
-
+// Exportamos o router e os docs no formato esperado pelo app.js
 module.exports = {
-  configureRouter,
-  docs: notificationDocs,
+    router,
+    docs,
 };

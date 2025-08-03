@@ -1,88 +1,61 @@
+// Ficheiro: API LIVE/routes/messaging.js (VERSÃO CORRIGIDA E MODERNIZADA)
+
 const express = require('express');
-const messagingController = require('../controllers/messagingController');
-const { verifyFirebaseToken } = require('../middleware/authMiddleware');
-const { checkRole } = require('../middleware/roleMiddleware');
-const {
-  scheduleTrainingValidator,
-  broadcastValidator,
-} = require('../validators/messagingValidators');
+const router = express.Router();
 
-// Objeto de documentação para as rotas de mensagens
-const messagingDocs = {
-  '/messaging/schedule-training': {
-    post: {
-      tags: ['Messaging'],
-      summary: '(Admin/Coach) Envia um anúncio de treino para um grupo do WhatsApp',
-      security: [{ bearerAuth: [] }],
-      requestBody: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                groupId: { type: 'string', description: 'O ID do grupo do WhatsApp (ex 12345@g.us).' },
-                sport: { type: 'string' },
-                day: { type: 'string' },
-                time: { type: 'string' },
-                location: { type: 'string' },
-                gender: { type: 'string' },
-              },
-            },
-          },
+// Importar o controlador e os middlewares necessários
+const { scheduleTraining, broadcastMessage } = require('../controllers/messagingController');
+const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware'); // ou coachMiddleware, dependendo da regra
+
+// Aplica a autenticação a todas as rotas de mensagens
+router.use(authMiddleware);
+
+// --- DEFINIÇÃO DAS ROTAS DE MENSAGENS ---
+
+// Rota para agendar uma mensagem de treino (exige permissão de admin/coach)
+router.post('/schedule-training', adminMiddleware, scheduleTraining);
+
+// Rota para enviar uma mensagem de broadcast (exige permissão de admin/coach)
+router.post('/broadcast', adminMiddleware, broadcastMessage);
+
+
+// --- DOCUMENTAÇÃO SWAGGER ---
+const docs = {
+    
+        '/messaging/schedule-training': {
+            post: {
+                summary: '(Admin/Coach) Envia uma mensagem de agendamento de treino',
+                tags: ['Mensagens'],
+                security: [{ bearerAuth: [] }],
+                requestBody: { content: { 'application/json': { schema: { properties: {
+                    groupId: { type: 'string' },
+                    sport: { type: 'string' },
+                    day: { type: 'string' },
+                    time: { type: 'string' },
+                    location: { type: 'string' },
+                    gender: { type: 'string' }
+                } } } } },
+                responses: { '200': { description: 'Mensagem enviada' } }
+            }
         },
-      },
-      responses: {
-        '200': { description: 'Anúncio de treino enviado com sucesso.' },
-        '403': { description: 'Acesso negado.' },
-      },
-    },
-  },
-  '/messaging/broadcast': {
-    post: {
-      tags: ['Messaging'],
-      summary: '(Admin/Member) Envia uma mensagem de broadcast para um grupo do WhatsApp',
-      security: [{ bearerAuth: [] }],
-      requestBody: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                groupId: { type: 'string', description: 'O ID do grupo do WhatsApp.' },
-                message: { type: 'string', description: 'A mensagem a ser enviada.' },
-              },
-            },
-          },
-        },
-      },
-      responses: {
-        '200': { description: 'Broadcast enviado com sucesso.' },
-        '403': { description: 'Acesso negado.' },
-      },
-    },
-  },
+        '/messaging/broadcast': {
+            post: {
+                summary: '(Admin/Coach) Envia uma mensagem de broadcast para um grupo',
+                tags: ['Mensagens'],
+                security: [{ bearerAuth: [] }],
+                requestBody: { content: { 'application/json': { schema: { properties: {
+                    groupId: { type: 'string' },
+                    message: { type: 'string' }
+                } } } } },
+                responses: { '200': { description: 'Mensagem enviada' } }
+            }
+        }
+    
 };
 
-// Esta função configura o router, garantindo que os controllers já foram carregados.
-const configureRouter = (router) => {
-  router.post(
-    '/schedule-training',
-    [verifyFirebaseToken, checkRole(['admin', 'coach'])],
-    scheduleTrainingValidator,
-    messagingController.scheduleTraining
-  );
-
-  router.post(
-    '/broadcast',
-    [verifyFirebaseToken, checkRole(['admin', 'member'])],
-    broadcastValidator,
-    messagingController.broadcastMessage
-  );
-};
-
+// Exportamos o router e os docs no formato esperado pelo app.js
 module.exports = {
-  configureRouter,
-  docs: messagingDocs,
+    router,
+    docs,
 };

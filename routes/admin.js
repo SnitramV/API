@@ -1,46 +1,28 @@
-// Ficheiro: API LIVE/routes/admin.js (VERSÃO FINAL E CORRIGIDA)
+// Ficheiro: APIv10/routes/admin.js (VERSÃO CORRIGIDA)
 
-const { listAllUsers, setUserRole } = require('../controllers/adminController');
-const { isAdmin } = require('../middleware/adminMiddleware');
-const { createVoucherValidator } = require('../validators/voucherValidators');
-const { createVoucher } = require('../controllers/vouchersController');
+const express = require('express');
+const router = express.Router();
 
-// --- A CORREÇÃO ESTÁ AQUI ---
-// Importamos a função com o seu nome real 'verifyFirebaseToken'
-const { verifyFirebaseToken } = require('../middleware/authMiddleware');
+// Middlewares e Controladores
+const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
+const adminController = require('../controllers/adminController');
 
-// Objeto de documentação (pode ser preenchido mais tarde)
-const docs = {};
+// Todas as rotas neste ficheiro exigem autenticação e permissão de admin.
+// Podemos aplicar os middlewares a todas as rotas de uma só vez.
+router.use(authMiddleware);
+router.use(adminMiddleware);
 
 /**
- * Configura as rotas de admin no router principal.
- * @param {import('express').Router} router - O router do Express para configurar.
+ * @desc    Rota para listar todos os utilizadores
+ * @route   GET /api/admin/users
  */
-const configureRouter = (router) => {
-    // Agora usamos 'verifyFirebaseToken' como o nosso middleware de autenticação.
-    // A ordem está correta: primeiro verifica o token, depois se é admin.
-    router.get(
-        '/users',
-        verifyFirebaseToken,
-        isAdmin,
-        listAllUsers
-    );
+router.get('/users', adminController.listAllUsers); // <--- Corresponde ao controlador
 
-    router.put(
-        '/users/:userId/role',
-        verifyFirebaseToken,
-        isAdmin,
-        setUserRole
-    );
-    router.post(
-        '/vouchers',
-        [verifyFirebaseToken, isAdmin], // Segurança
-        createVoucherValidator,         // Validação
-        createVoucher                   // Lógica
-    );
-};
+/**
+ * @desc    Rota para definir a role de um utilizador
+ * @route   POST /api/admin/users/:uid/role
+ */
+router.post('/users/:uid/role', adminController.setUserRole); // <--- Corresponde ao controlador
 
-module.exports = {
-    docs,
-    configureRouter,
-};
+module.exports = router;

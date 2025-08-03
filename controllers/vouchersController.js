@@ -1,98 +1,80 @@
-// Ficheiro: API LIVE/controllers/vouchersController.js (VERSÃO COM RESGATE)
+// Ficheiro: API LIVE/controllers/voucherController.js (CRIE ESTE FICHEIRO)
 
-const { db, admin } = require('../config/firebase');
+const { db } = require('../config/firebase');
 const asyncHandler = require('../utils/asyncHandler');
+const logger = require('../config/logger');
 
 /**
- * @desc    (Admin) Cria um novo código de voucher
- * @route   POST /api/admin/vouchers
- * @access  Admin
+ * @desc    Admin cria um novo voucher
  */
 const createVoucher = asyncHandler(async (req, res) => {
-    const { code, points, usageLimit, expiresAt } = req.body;
-    const voucherRef = db.collection('vouchers').doc(code.toUpperCase());
-    const doc = await voucherRef.get();
+    const { code, points, expiresAt } = req.body;
 
-    if (doc.exists) {
-        return res.status(409).json({ message: 'Este código de voucher já existe.' });
-    }
+    // Garante que o código está em maiúsculas para evitar duplicados
+    const upperCaseCode = code.toUpperCase();
 
     const newVoucher = {
-        code: code.toUpperCase(),
-        points: Number(points),
-        usageLimit: Number(usageLimit),
-        timesUsed: 0,
-        expiresAt: new Date(expiresAt),
-        createdAt: new Date(),
+        code: upperCaseCode,
+        points: parseInt(points, 10),
         isActive: true,
+        createdAt: new Date(),
+        expiresAt: new Date(expiresAt),
+        redeemedBy: null,
+        redeemedAt: null,
     };
 
-    await voucherRef.set(newVoucher);
+    // Usar o código como ID do documento para garantir que sejam únicos
+    await db.collection('vouchers').doc(upperCaseCode).set(newVoucher);
+
+    logger.info(`Voucher ${upperCaseCode} criado com sucesso.`);
     res.status(201).json({ message: 'Voucher criado com sucesso!', voucher: newVoucher });
 });
 
-
 /**
- * @desc    (User) Resgata um código de voucher
- * @route   POST /api/vouchers/redeem
- * @access  Private (Utilizadores logados)
+ * @desc    Utilizador resgata um voucher
  */
 const redeemVoucher = asyncHandler(async (req, res) => {
+    const { uid } = req.user;
     const { code } = req.body;
-    const { uid } = req.user; // UID do utilizador que está a tentar resgatar
+    const upperCaseCode = code.toUpperCase();
 
-    const voucherRef = db.collection('vouchers').doc(code.toUpperCase());
+    const voucherRef = db.collection('vouchers').doc(upperCaseCode);
     const userRef = db.collection('users').doc(uid);
 
-    // Usamos uma transação para garantir que todas as operações ocorram com sucesso ou nenhuma ocorra.
-    // Isto previne problemas de concorrência (vários utilizadores a tentar usar o último voucher ao mesmo tempo).
-    try {
-        const pointsAwarded = await db.runTransaction(async (transaction) => {
-            const voucherDoc = await transaction.get(voucherRef);
+    // Usamos uma transação para garantir que a operação é atómica
+    // (ou tudo funciona, ou nada funciona)
+    await db.runTransaction(async (transaction) => {
+        const voucherDoc = await transaction.get(voucherRef);
+        const userDoc = await transaction.get(userRef);
 
-            if (!voucherDoc.exists) {
-                throw new Error('Código de voucher inválido.');
-            }
+        if (!voucherDoc.exists || !voucherDoc.data().isActive) {
+            // Usamos return para parar a execução e enviar a resposta
+            return res.status(404).json({ message: 'Voucher inválido, expirado ou já utilizado.' });
+        }
 
-            const voucherData = voucherDoc.data();
+        if (new Date() > voucherDoc.data().expiresAt.toDate()) {
+            // Desativa o voucher se estiver expirado
+            transaction.update(voucherRef, { isActive: false });
+            return res.status(400).json({ message: 'Este voucher expirou.' });
+        }
 
-            if (!voucherData.isActive || new Date() > voucherData.expiresAt.toDate()) {
-                throw new Error('Este voucher expirou ou não está mais ativo.');
-            }
-            if (voucherData.timesUsed >= voucherData.usageLimit) {
-                throw new Error('Este voucher já atingiu o seu limite de utilizações.');
-            }
+        const currentPoints = userDoc.data().points || 0;
+        const voucherPoints = voucherDoc.data().points;
 
-            // Verifica se este utilizador específico já resgatou este voucher
-            const redemptionRef = voucherRef.collection('redemptions').doc(uid);
-            const redemptionDoc = await transaction.get(redemptionRef);
-            if (redemptionDoc.exists) {
-                throw new Error('Você já resgatou este código de voucher.');
-            }
-
-            // Se todas as verificações passaram, executa as atualizações
-            transaction.update(userRef, {
-                points: admin.firestore.FieldValue.increment(voucherData.points)
-            });
-            transaction.update(voucherRef, {
-                timesUsed: admin.firestore.FieldValue.increment(1)
-            });
-            // Marca que este utilizador resgatou o voucher para não poder usar novamente
-            transaction.set(redemptionRef, { redeemedAt: new Date() });
-
-            return voucherData.points;
+        // Atualiza os pontos do utilizador e desativa o voucher
+        transaction.update(userRef, { points: currentPoints + voucherPoints });
+        transaction.update(voucherRef, {
+            isActive: false,
+            redeemedBy: uid,
+            redeemedAt: new Date(),
         });
 
-        res.status(200).json({ message: `Parabéns! Você resgatou ${pointsAwarded} pontos!` });
-
-    } catch (error) {
-        // A transação falha e retorna o erro específico
-        res.status(400).json({ message: error.message });
-    }
+        // Retornamos a resposta de sucesso dentro da transação
+        return res.status(200).json({ message: `Voucher resgatado! Você ganhou ${voucherPoints} pontos.` });
+    });
 });
-
 
 module.exports = {
     createVoucher,
-    redeemVoucher, // <-- ADICIONADO ÀS EXPORTAÇÕES
+    redeemVoucher,
 };

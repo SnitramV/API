@@ -1,25 +1,40 @@
-// middleware/authMiddleware.js
-const { admin } = require('../config/firebase'); // <-- CORREÇÃO APLICADA
+// Ficheiro: APIv10/middleware/authMiddleware.js (VERSÃO CORRIGIDA)
 
-const verifyFirebaseToken = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
+const { admin } = require('../config/firebase');
+const logger = require('../config/logger');
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Acesso não autorizado. Token não fornecido ou em formato inválido.' });
-  }
+/**
+ * @desc    Middleware para verificar o token JWT do Firebase.
+ * Se o token for válido, adiciona o utilizador (user) ao objeto de requisição (req).
+ */
+const authMiddleware = async (req, res, next) => {
+    // Procura pelo cabeçalho de autorização
+    const authHeader = req.headers.authorization;
 
-  const idToken = authHeader.split('Bearer ')[1];
+    // Verifica se o cabeçalho existe e se começa com "Bearer "
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        logger.warn('Tentativa de acesso sem token de autenticação.');
+        return res.status(401).json({ error: 'Não autorizado. Token não fornecido.' });
+    }
 
-  try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    req.user = decodedToken;
-    next();
-  } catch (error) {
-    console.error('Erro ao verificar o token:', error);
-    return res.status(403).json({ message: 'Acesso proibido. Token inválido ou expirado.' });
-  }
+    // Extrai o token do cabeçalho
+    const idToken = authHeader.split('Bearer ')[1];
+
+    try {
+        // Verifica o token usando o SDK Admin do Firebase
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        
+        // Anexa os dados do utilizador decodificados ao objeto 'req'
+        // para que as rotas subsequentes possam aceder-lhe
+        req.user = decodedToken;
+        
+        // Passa para o próximo middleware ou controlador
+        next();
+    } catch (error) {
+        logger.error('Erro na verificação do token JWT:', error);
+        return res.status(403).json({ error: 'Token inválido ou expirado.' });
+    }
 };
 
-module.exports = {
-  verifyFirebaseToken,
-};
+// Exporta a função diretamente, em vez de um objeto
+module.exports = authMiddleware;

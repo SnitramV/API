@@ -1,20 +1,17 @@
-// Ficheiro: API LIVE/controllers/coachController.js
+// Ficheiro: API LIVE/controllers/coachController.js (VERSÃO CORRIGIDA)
 
 const { db } = require('../config/firebase');
 const asyncHandler = require('../utils/asyncHandler');
 const botService = require('../services/botService');
-const sportsGroups = require('../config/sportsGroups'); // Importamos a nossa nova configuração
+const sportsGroups = require('../config/sportsGroups');
 
 /**
- * @desc    Agenda um novo treino para a modalidade do treinador
- * @route   POST /api/coach/trainings
- * @access  Coach
+ * @desc    Lógica para agendar um novo treino para a modalidade do treinador.
  */
 const scheduleTraining = asyncHandler(async (req, res) => {
     const { uid } = req.user;
     const { title, date, location, description } = req.body;
 
-    // Busca os dados do treinador no Firestore para descobrir a sua modalidade
     const userDoc = await db.collection('users').doc(uid).get();
     if (!userDoc.exists || !userDoc.data().sport) {
         return res.status(400).json({ message: 'A sua conta não está associada a nenhuma modalidade.' });
@@ -26,7 +23,7 @@ const scheduleTraining = asyncHandler(async (req, res) => {
         date: new Date(date),
         location,
         description,
-        sport, // Associa o treino à modalidade do treinador
+        sport,
         scheduledBy: uid,
         createdAt: new Date(),
     };
@@ -37,9 +34,7 @@ const scheduleTraining = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc    Envia uma mensagem para o grupo de WhatsApp da equipa
- * @route   POST /api/coach/broadcast
- * @access  Coach
+ * @desc    Lógica para enviar uma mensagem para o grupo de WhatsApp da equipa.
  */
 const broadcastToTeam = asyncHandler(async (req, res) => {
     const { uid } = req.user;
@@ -56,12 +51,14 @@ const broadcastToTeam = asyncHandler(async (req, res) => {
         return res.status(404).json({ message: `Não foi encontrado um grupo de WhatsApp configurado para a modalidade '${sport}'.` });
     }
     
-    // Usamos o botService para comandar o bot a enviar a mensagem
     await botService.sendMessage(groupId, message);
 
     res.status(200).json({ message: `Mensagem enviada para o grupo de ${sport}.` });
 });
 
+// Adicione aqui outras funções de lógica de coach que precisar.
+
+// Exporta apenas as funções lógicas.
 module.exports = {
     scheduleTraining,
     broadcastToTeam,

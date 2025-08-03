@@ -1,55 +1,54 @@
+// Ficheiro: API LIVE/routes/bot.js (VERSÃO CORRIGIDA E MODERNIZADA)
+
 const express = require('express');
-const botController = require('../controllers/botController');
-const { verifyFirebaseToken } = require('../middleware/authMiddleware');
-const { checkRole } = require('../middleware/roleMiddleware');
+const router = express.Router();
 
-// Objeto de documentação para as rotas do bot
-const botDocs = {
-  '/bot/sync-groups': {
-    post: {
-      tags: ['Bot'],
-      summary: '(Admin) Sincroniza os grupos do WhatsApp para o Firestore',
-      security: [{ bearerAuth: [] }],
-      responses: {
-        '200': {
-          description: 'Grupos sincronizados com sucesso.',
+// Importar controladores e middlewares
+const { syncGroups, listGroups } = require('../controllers/botController');
+const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
+
+// Aplica a verificação de admin a todas as rotas de bot
+router.use(authMiddleware);
+router.use(adminMiddleware);
+
+
+// --- DEFINIÇÃO DAS ROTAS DO BOT ---
+
+// Rota para sincronizar os grupos do WhatsApp com o Firestore
+router.post('/sync-groups', syncGroups);
+
+// Rota para listar os grupos já sincronizados
+router.get('/list-groups', listGroups);
+
+
+// --- DOCUMENTAÇÃO SWAGGER ---
+const docs = {
+    
+        '/bot/sync-groups': {
+            post: {
+                summary: '(Admin) Sincroniza grupos do WhatsApp para o Firestore',
+                tags: ['Bot'],
+                security: [{ bearerAuth: [] }],
+                responses: { 
+                    '200': { description: 'Grupos sincronizados' },
+                    '500': { description: 'Falha na sincronização' }
+                }
+            }
         },
-        '500': {
-          description: 'Falha na sincronização.',
-        },
-      },
-    },
-  },
-  '/bot/groups': {
-    get: {
-      tags: ['Bot'],
-      summary: '(Admin) Lista os grupos do WhatsApp já sincronizados no Firestore',
-      security: [{ bearerAuth: [] }],
-      responses: {
-        '200': {
-          description: 'Lista de grupos sincronizados.',
-        },
-      },
-    },
-  },
+        '/bot/list-groups': {
+            get: {
+                summary: '(Admin) Lista os grupos de WhatsApp sincronizados',
+                tags: ['Bot'],
+                security: [{ bearerAuth: [] }],
+                responses: { '200': { description: 'Lista de grupos' } }
+            }
+        }
+    
 };
 
-// Esta função configura o router
-const configureRouter = (router) => {
-  router.post(
-    '/sync-groups',
-    [verifyFirebaseToken, checkRole(['admin'])],
-    botController.syncGroups
-  );
-
-  router.get(
-    '/groups',
-    [verifyFirebaseToken, checkRole(['admin'])],
-    botController.listGroups
-  );
-};
-
+// Exportamos o router e os docs no formato esperado pelo app.js
 module.exports = {
-  configureRouter,
-  docs: botDocs,
+    router,
+    docs
 };

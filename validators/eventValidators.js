@@ -1,16 +1,26 @@
-const { body, param } = require('express-validator');
-const { handleValidationErrors } = require('../middleware/validationHandler');
+// Ficheiro: APIv10/validators/eventValidators.js (VERSÃO CORRIGIDA)
 
+const { body, param } = require('express-validator');
+
+// Validador para a criação de eventos
 const createEventValidator = [
-    body('name').notEmpty().withMessage('O nome do evento é obrigatório.').trim().escape(),
-    body('date').isISO8601().withMessage('A data do evento é obrigatória e deve estar no formato AAAA-MM-DD.'),
-    body('points').isInt({ gt: 0 }).withMessage('A quantidade de pontos deve ser um número inteiro positivo.'),
-    handleValidationErrors,
+    body('name')
+        .trim()
+        .notEmpty().withMessage('O nome do evento é obrigatório.'),
+
+    body('date')
+        .isISO8601().withMessage('A data deve estar no formato ISO8601 (YYYY-MM-DD).'),
+
+    body('points')
+        .isInt({ min: 1 }).withMessage('Os pontos devem ser um número inteiro positivo.')
 ];
 
+// Validador para o check-in em eventos
 const checkInValidator = [
-    param('eventId').isString().notEmpty().withMessage('O ID do evento na URL é obrigatório.'),
-    handleValidationErrors,
+    param('eventId')
+        .trim()
+        .notEmpty().withMessage('O ID do evento é obrigatório na URL.')
+        .isString().withMessage('O ID do evento deve ser um texto.')
 ];
 
 module.exports = {

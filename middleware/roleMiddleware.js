@@ -1,31 +1,30 @@
-// middleware/roleMiddleware.js
-const { db, admin } = require('../config/firebase');
+// Ficheiro: API LIVE/middleware/roleMiddleware.js (CRIE ESTE FICHEIRO)
 
-const checkRole = (allowedRoles) => {
-  return async (req, res, next) => {
-    const { uid } = req.user;
+const logger = require('../config/logger');
 
-    try {
-      const userRef = db.collection('users').doc(uid);
-      const doc = await userRef.get();
+/**
+ * Middleware genérico para verificar se o utilizador tem uma das roles permitidas.
+ * @param {string[]} allowedRoles - Um array de strings com as roles permitidas (ex: ['admin', 'coach']).
+ * @returns Um middleware do Express.
+ */
+const roleMiddleware = (allowedRoles) => {
+    return (req, res, next) => {
+        // Pega a role do utilizador, definida pelo authMiddleware
+        const userRole = req.user?.role;
 
-      if (!doc.exists) {
-        return res.status(404).json({ message: 'Usuário não encontrado.' });
-      }
-
-      const { role } = doc.data();
-
-      if (allowedRoles.includes(role)) {
-        return next();
-      } else {
-        return res.status(403).json({ message: 'Acesso negado. Você não tem a permissão necessária.' });
-      }
-    } catch (error) {
-      // --- CORREÇÃO DE ERRO ---
-      console.error('Erro ao verificar permissão:', error);
-      return res.status(500).json({ message: 'Erro interno ao verificar permissões.' });
-    }
-  };
+        // Verifica se o utilizador tem uma role e se essa role está na lista de permitidas
+        if (userRole && allowedRoles.includes(userRole)) {
+            // Se tiver a permissão, continua para a próxima função
+            next();
+        } else {
+            // Se não tiver, nega o acesso
+            logger.warn(`Acesso negado para a role '${userRole}'. Utilizador: ${req.user?.uid}`);
+            res.status(403).json({
+                message: `Acesso negado. É necessária uma das seguintes permissões: ${allowedRoles.join(', ')}.`,
+            });
+        }
+    };
 };
 
-module.exports = { checkRole };
+// Exporta a função que cria o middleware
+module.exports = roleMiddleware;

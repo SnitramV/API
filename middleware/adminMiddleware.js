@@ -1,29 +1,22 @@
-// Ficheiro: API LIVE/middleware/adminMiddleware.js
+// Ficheiro: APIv10/middleware/adminMiddleware.js (VERSÃO CORRIGIDA)
 
-const { admin } = require('../config/firebase');
+const logger = require('../config/logger');
 
 /**
- * Middleware para verificar se o utilizador autenticado tem a função de 'admin'.
- * Este middleware deve ser usado DEPOIS do middleware de autenticação.
+ * @desc    Middleware para verificar se o utilizador tem a role 'admin'.
+ * Este middleware deve ser usado DEPOIS do authMiddleware.
  */
-const isAdmin = async (req, res, next) => {
-    // O middleware de autenticação (que você já deve ter) deve adicionar o 'user' ao 'req'.
-    const { uid } = req.user;
-
-    try {
-        const userRecord = await admin.auth().getUser(uid);
-        // Verifica as 'custom claims' do utilizador
-        if (userRecord.customClaims && userRecord.customClaims.role === 'admin') {
-            // Se for admin, permite que a requisição continue
-            return next();
-        } else {
-            // Se não for admin, retorna um erro de acesso proibido
-            return res.status(403).json({ message: 'Acesso negado. Apenas administradores podem realizar esta ação.' });
-        }
-    } catch (error) {
-        console.error('Erro ao verificar a função de administrador:', error);
-        return res.status(500).json({ message: 'Erro interno ao verificar permissões.' });
+const adminMiddleware = (req, res, next) => {
+    // O authMiddleware já deve ter colocado o objeto 'user' na requisição
+    if (req.user && req.user.role === 'admin') {
+        // Se o utilizador existe e tem a role 'admin', continua
+        next();
+    } else {
+        // Se não tiver a role 'admin', nega o acesso
+        logger.warn(`Acesso negado: Utilizador ${req.user?.uid || '(desconhecido)'} sem permissão de admin.`);
+        return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
     }
 };
 
-module.exports = { isAdmin };
+// Exporta a função de middleware diretamente
+module.exports = adminMiddleware;

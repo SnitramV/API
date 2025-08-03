@@ -1,8 +1,9 @@
-// Ficheiro: API LIVE/controllers/eventController.js (VERSÃO COM CHECK-IN)
+// Ficheiro: APIv10/controllers/eventController.js (VERSÃO CORRIGIDA)
 
-const { db, admin } = require('../config/firebase');
+const { db } = require('../config/firebase');
 const asyncHandler = require('../utils/asyncHandler');
 const eventService = require('../services/eventService');
+const logger = require('../config/logger');
 
 /**
  * @desc    Admin cria um novo evento para check-in
@@ -11,39 +12,27 @@ const eventService = require('../services/eventService');
  */
 const createEvent = asyncHandler(async (req, res) => {
     const { name, date, points } = req.body;
-    
-    // A função no service agora deve receber 'points' como 'checkInPoints'
-    const eventId = await eventService.createCheckinEvent({ name, date, checkInPoints: points });
-
+    const eventId = await eventService.createCheckinEvent({ name, date, points });
     res.status(201).json({
         message: `Evento '${name}' criado com sucesso.`,
         eventId: eventId
     });
 });
 
-exports.deleteEvent = async (req, res) => {
-    try {
-        // Extrai o ID do evento dos parâmetros da rota
-        const { eventId } = req.params;
-        
-        // Chama o serviço para executar a lógica de apagar
-        await eventService.deleteEvent(eventId);
-        
-        // Envia uma resposta de sucesso
-        res.status(200).json({ message: 'Evento apagado com sucesso.' });
-        logger.info(`Evento ${eventId} apagado com sucesso por um administrador.`);
+/**
+ * @desc    (Admin) Apaga um evento
+ * @route   DELETE /api/events/:eventId
+ * @access  Private (Admin)
+ */
+const deleteEvent = asyncHandler(async (req, res) => {
+    const { eventId } = req.params;
 
-    } catch (error) {
-        logger.error(`Erro ao apagar o evento ${req.params.eventId}: ${error.message}`);
-        
-        // Envia uma resposta de erro apropriada se o evento não for encontrado
-        if (error.message.includes('não encontrado')) {
-            return res.status(404).json({ error: error.message });
-        }
-        
-        res.status(500).json({ error: 'Erro interno do servidor ao tentar apagar o evento.' });
-    }
-};
+    // O service já trata o caso de evento não encontrado, lançando um erro.
+    await eventService.deleteEvent(eventId);
+
+    logger.info(`Evento ${eventId} apagado com sucesso por um administrador.`);
+    res.status(200).json({ message: 'Evento apagado com sucesso.' });
+});
 
 /**
  * @desc    Lista todos os eventos públicos da planilha
@@ -55,7 +44,6 @@ const listPublicEvents = asyncHandler(async (req, res) => {
     res.status(200).json(events);
 });
 
-
 /**
  * @desc    Utilizador faz check-in num evento e ganha pontos
  * @route   POST /api/events/:eventId/checkin
@@ -65,17 +53,25 @@ const checkInToEvent = asyncHandler(async (req, res) => {
     const { eventId } = req.params;
     const { uid } = req.user;
 
-    const result = await eventService.processCheckIn(eventId, uid);
+    const eventRef = db.collection('events').doc(eventId);
+    const eventDoc = await eventRef.get();
+
+    if (!eventDoc.exists) {
+        return res.status(404).json({ message: "Evento não encontrado." });
+    }
+
+    const eventData = eventDoc.data();
+    // Passamos os pontos do evento para o serviço processar o check-in
+    const result = await eventService.processCheckIn(eventId, uid, eventData.points);
 
     res.status(200).json({
-        message: `Check-in no evento '${result.eventName}' realizado! Você ganhou ${result.pointsAwarded} pontos.`
+        message: `Check-in no evento '${eventData.name}' realizado! Você ganhou ${result.pointsAwarded} pontos.`
     });
 });
 
-
 module.exports = {
   createEvent,
-  checkInToEvent, // <-- A NOVA FUNÇÃO
+  checkInToEvent,
   listPublicEvents,
   deleteEvent,
 };

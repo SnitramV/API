@@ -1,29 +1,23 @@
-// Ficheiro: API LIVE/middleware/coachMiddleware.js
+// Ficheiro: API LIVE/middleware/coachMiddleware.js (VERSÃO CORRIGIDA)
 
-const { admin } = require('../config/firebase');
+const logger = require('../config/logger');
 
 /**
- * Middleware para verificar se o utilizador autenticado tem a função de 'coach'.
- * Deve ser usado DEPOIS do middleware de autenticação (verifyFirebaseToken).
+ * @desc    Middleware para verificar se o utilizador tem a role 'coach'.
+ * Este middleware deve ser usado DEPOIS do authMiddleware,
+ * pois ele depende do req.user que o authMiddleware define.
  */
-const isCoach = async (req, res, next) => {
-    // A UID do utilizador vem do middleware de autenticação
-    const { uid } = req.user;
-
-    try {
-        const userRecord = await admin.auth().getUser(uid);
-        // Verificamos se a 'custom claim' é 'coach' OU 'admin'
-        // Isto permite que um admin também possa usar as ferramentas de treinador.
-        const userRole = userRecord.customClaims?.role;
-        if (userRole === 'coach' || userRole === 'admin') {
-            return next();
-        } else {
-            return res.status(403).json({ message: 'Acesso negado. Apenas treinadores ou administradores podem realizar esta ação.' });
-        }
-    } catch (error) {
-        console.error('Erro ao verificar a função de treinador:', error);
-        return res.status(500).json({ message: 'Erro interno ao verificar permissões.' });
+const coachMiddleware = (req, res, next) => {
+    // Verifica se o objeto 'user' existe e se a sua role é 'coach'
+    if (req.user && req.user.role === 'coach') {
+        // Se for um coach, permite que a requisição continue
+        next();
+    } else {
+        // Se não for um coach, nega o acesso
+        logger.warn(`Acesso negado: Utilizador ${req.user?.uid || '(desconhecido)'} sem permissão de coach.`);
+        return res.status(403).json({ error: 'Acesso negado. Recurso exclusivo para treinadores.' });
     }
 };
 
-module.exports = { isCoach };
+// Exporta a função diretamente, em vez de um objeto
+module.exports = coachMiddleware;

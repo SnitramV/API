@@ -1,30 +1,23 @@
-// Ficheiro: API LIVE/middleware/sellerMiddleware.js
+// Ficheiro: API LIVE/middleware/sellerMiddleware.js (CRIE ESTE FICHEIRO)
 
-const { admin } = require('../config/firebase');
+const logger = require('../config/logger');
 
 /**
- * Middleware para verificar se o utilizador autenticado tem a função de 'seller'.
- * Um 'admin' também terá acesso.
- * Deve ser usado DEPOIS do middleware de autenticação (verifyFirebaseToken).
+ * @desc    Middleware para verificar se o utilizador tem a role 'seller' ou 'admin'.
+ * Admins também devem poder realizar vendas.
+ * @note    Este middleware deve ser usado DEPOIS do authMiddleware.
  */
-const isSeller = async (req, res, next) => {
-    // A UID do utilizador vem do middleware de autenticação
-    const { uid } = req.user;
-
-    try {
-        const userRecord = await admin.auth().getUser(uid);
-        const userRole = userRecord.customClaims?.role;
-
-        // Permite o acesso se a função for 'seller' OU 'admin'
-        if (userRole === 'seller' || userRole === 'admin') {
-            return next();
-        } else {
-            return res.status(403).json({ message: 'Acesso negado. Apenas vendedores ou administradores podem realizar esta ação.' });
-        }
-    } catch (error) {
-        console.error('Erro ao verificar a função de vendedor:', error);
-        return res.status(500).json({ message: 'Erro interno ao verificar permissões.' });
+const sellerMiddleware = (req, res, next) => {
+    // Verifica se o utilizador tem a role 'seller' OU 'admin'
+    if (req.user && (req.user.role === 'seller' || req.user.role === 'admin')) {
+        // Se tiver a permissão, continua
+        next();
+    } else {
+        // Se não tiver, nega o acesso
+        logger.warn(`Acesso negado: Utilizador ${req.user?.uid || '(desconhecido)'} sem permissão de vendedor.`);
+        return res.status(403).json({ error: 'Acesso negado. Recurso exclusivo para vendedores.' });
     }
 };
 
-module.exports = { isSeller };
+// Exporta a função diretamente para ser usada nas rotas
+module.exports = sellerMiddleware;

@@ -1,78 +1,85 @@
-// Arquivo: API - Copia/routes/password.js
+// Ficheiro: API LIVE/routes/products.js (VERSÃO CORRIGIDA E MODERNIZADA)
 
 const express = require('express');
-const passwordController = require('../controllers/passwordController');
-const { sensitiveRoutesLimiter } = require('../middleware/rateLimiter');
-// Se você tiver validadores, pode adicioná-los aqui. Ex:
-// const { requestResetValidator } = require('../validators/passwordValidators');
+const router = express.Router();
 
-// Objeto de documentação para as rotas de senha
-const passwordDocs = {
-  '/password/request-reset': {
-    post: {
-      tags: ['Password'],
-      summary: 'Solicita um código de recuperação de senha',
-      description:
-        'Envia um código de verificação para o WhatsApp do usuário associado ao e-mail.',
-      requestBody: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              required: ['email'],
-              properties: { email: { type: 'string', format: 'email' } },
+// Importar o controlador e os middlewares
+const {
+    getAllProducts,
+    getProductById,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    adjustStock
+} = require('../controllers/productController');
+const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
+
+// --- DEFINIÇÃO DAS ROTAS DE PRODUTOS ---
+
+// Rotas públicas (não precisam de login)
+router.get('/', getAllProducts);
+router.get('/:id', getProductById);
+
+// Rotas protegidas que exigem permissão de admin
+router.post('/', authMiddleware, adminMiddleware, createProduct);
+router.put('/:id', authMiddleware, adminMiddleware, updateProduct);
+router.delete('/:id', authMiddleware, adminMiddleware, deleteProduct);
+router.post('/:productId/adjust-stock', authMiddleware, adminMiddleware, adjustStock);
+
+
+// --- DOCUMENTAÇÃO SWAGGER ---
+const docs = {
+    
+        '/products': {
+            get: {
+                summary: 'Lista todos os produtos',
+                tags: ['Produtos'],
+                responses: { '200': { description: 'Lista de produtos' } }
             },
-          },
+            post: {
+                summary: '(Admin) Cria um novo produto',
+                tags: ['Produtos', 'Admin'],
+                security: [{ bearerAuth: [] }],
+                responses: { '201': { description: 'Produto criado' } }
+            }
         },
-      },
-      responses: {
-        '200': { description: 'Código de verificação enviado.' },
-        '404': { description: 'Nenhuma conta encontrada com este e-mail.' },
-      },
-    },
-  },
-  '/password/verify-and-reset': {
-    post: {
-      tags: ['Password'],
-      summary: 'Verifica o código e redefine a senha',
-      requestBody: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              required: ['email', 'code', 'newPassword'],
-              properties: {
-                email: { type: 'string', format: 'email' },
-                code: { type: 'string' },
-                newPassword: { type: 'string', format: 'password' },
-              },
+        '/products/{id}': {
+            get: {
+                summary: 'Busca um produto por ID',
+                tags: ['Produtos'],
+                parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+                responses: { '200': { description: 'Detalhes do produto' } }
             },
-          },
+            put: {
+                summary: '(Admin) Atualiza um produto por ID',
+                tags: ['Produtos', 'Admin'],
+                security: [{ bearerAuth: [] }],
+                parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+                responses: { '200': { description: 'Produto atualizado' } }
+            },
+            delete: {
+                summary: '(Admin) Deleta um produto por ID',
+                tags: ['Produtos', 'Admin'],
+                security: [{ bearerAuth: [] }],
+                parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+                responses: { '204': { description: 'Produto deletado' } }
+            }
         },
-      },
-      responses: {
-        '200': { description: 'Senha redefinida com sucesso.' },
-        '400': { description: 'Código inválido, expirado ou dados incorretos.' },
-      },
-    },
-  },
+        '/products/{productId}/adjust-stock': {
+            post: {
+                summary: '(Admin) Ajusta o stock de um produto',
+                tags: ['Produtos', 'Admin'],
+                security: [{ bearerAuth: [] }],
+                parameters: [{ name: 'productId', in: 'path', required: true, schema: { type: 'string' } }],
+                responses: { '200': { description: 'Stock ajustado' } }
+            }
+        }
+    
 };
 
-// Esta função configura o router
-const configureRouter = (router) => {
-  // Aplica um limite de requisições para estas rotas
-  router.use(sensitiveRoutesLimiter);
-
-  router.post('/request-reset', passwordController.requestPasswordReset);
-  router.post(
-    '/verify-and-reset',
-    passwordController.verifyCodeAndResetPassword
-  );
-};
-
+// Exportamos o router e os docs no formato esperado pelo app.js
 module.exports = {
-  configureRouter,
-  docs: passwordDocs,
+    router,
+    docs,
 };

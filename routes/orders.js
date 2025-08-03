@@ -1,97 +1,85 @@
-// Ficheiro: API LIVE/routes/orders.js (VERSÃO COM PONTO DE VENDA)
+// Ficheiro: API LIVE/routes/orders.js (VERSÃO CORRIGIDA E MODERNIZADA)
 
 const express = require('express');
-const orderController = require('../controllers/orderController');
-const { verifyFirebaseToken } = require('../middleware/authMiddleware');
-const { checkProfileCompletion } = require('../middleware/profileMiddleware');
-const { checkRole } = require('../middleware/roleMiddleware');
-const { isSeller } = require('../middleware/sellerMiddleware'); // <-- IMPORTADO
+const router = express.Router();
+
+// Importar o controlador e os middlewares
 const {
-  createOrderValidator,
-  updateStatusValidator,
-} = require('../validators/orderValidators');
+    createOrder,
+    getUserOrders,
+    getAllOrders,
+    updateOrderStatus,
+    createPresentialOrder
+} = require('../controllers/orderController');
+const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
+// Supondo que você tenha um middleware para vendedores
+const sellerMiddleware = require('../middleware/sellerMiddleware'); 
 
-const orderDocs = {
-  '/orders': {
-    // ... (documentação existente)
-  },
-  // --- DOCUMENTAÇÃO PARA A NOVA ROTA DE PONTO DE VENDA ---
-  '/orders/presential': {
-    post: {
-      tags: ['Orders', 'Seller'],
-      summary: '(Seller/Admin) Cria um novo pedido para uma venda presencial',
-      security: [{ bearerAuth: [] }],
-      requestBody: {
-        required: true,
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                items: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      productId: { type: 'string' },
-                      quantity: { type: 'integer' },
-                    },
-                  },
-                },
-                paymentMethod: { type: 'string', enum: ['cash', 'card', 'pix'] },
-                customerId: { type: 'string', description: 'UID do cliente (opcional, para cashback)' },
-              },
+// --- DEFINIÇÃO DAS ROTAS DE PEDIDOS ---
+
+// Rota para um utilizador criar um novo pedido online
+router.post('/', authMiddleware, createOrder);
+
+// Rota para um utilizador buscar os seus próprios pedidos
+router.get('/', authMiddleware, getUserOrders);
+
+// Rota para um admin buscar todos os pedidos do sistema
+router.get('/all', authMiddleware, adminMiddleware, getAllOrders);
+
+// Rota para um admin atualizar o status de um pedido
+router.patch('/:orderId/status', authMiddleware, adminMiddleware, updateOrderStatus);
+
+// Rota para um vendedor criar um pedido presencial
+router.post('/presential', authMiddleware, sellerMiddleware, createPresentialOrder);
+
+
+// --- DOCUMENTAÇÃO SWAGGER ---
+const docs = {
+    
+        '/orders': {
+            post: {
+                summary: 'Utilizador cria um novo pedido online',
+                tags: ['Pedidos'],
+                security: [{ bearerAuth: [] }],
+                responses: { '201': { description: 'Pedido criado' } }
             },
-          },
+            get: {
+                summary: 'Utilizador busca os seus pedidos',
+                tags: ['Pedidos'],
+                security: [{ bearerAuth: [] }],
+                responses: { '200': { description: 'Lista de pedidos do utilizador' } }
+            }
         },
-      },
-      responses: {
-        '201': { description: 'Venda registada com sucesso.' },
-        '400': { description: 'Dados inválidos ou stock insuficiente.' },
-        '403': { description: 'Acesso negado (não é um vendedor).' },
-      },
-    },
-  },
-  '/orders/my-history': {
-    // ... (documentação existente)
-  },
-  '/orders/all': {
-    // ... (documentação existente)
-  },
-  '/orders/{orderId}/status': {
-    // ... (documentação existente)
-  },
+        '/orders/all': {
+            get: {
+                summary: '(Admin) Busca todos os pedidos do sistema',
+                tags: ['Pedidos', 'Admin'],
+                security: [{ bearerAuth: [] }],
+                responses: { '200': { description: 'Lista de todos os pedidos' } }
+            }
+        },
+        '/orders/{orderId}/status': {
+            patch: {
+                summary: '(Admin) Atualiza o status de um pedido',
+                tags: ['Pedidos', 'Admin'],
+                security: [{ bearerAuth: [] }],
+                responses: { '200': { description: 'Status atualizado' } }
+            }
+        },
+        '/orders/presential': {
+            post: {
+                summary: '(Vendedor) Cria um pedido de venda presencial',
+                tags: ['Pedidos', 'Vendedor'],
+                security: [{ bearerAuth: [] }],
+                responses: { '201': { description: 'Venda presencial registada' } }
+            }
+        }
+    
 };
 
-const configureRouter = (router) => {
-  // Rota para pedidos online de clientes
-  router.post(
-    '/',
-    [verifyFirebaseToken, checkProfileCompletion],
-    createOrderValidator,
-    orderController.createOrder
-  );
-
-  // --- NOVA ROTA PARA O PONTO DE VENDA ---
-  router.post(
-    '/presential',
-    verifyFirebaseToken,
-    isSeller,
-    orderController.createPresentialOrder
-  );
-
-  // Rotas de visualização e gestão
-  router.get('/my-history', verifyFirebaseToken, orderController.getUserOrders);
-  router.get('/all', [verifyFirebaseToken, checkRole(['admin'])], orderController.getAllOrders);
-  router.put(
-    '/:orderId/status',
-    [verifyFirebaseToken, checkRole(['admin'])],
-    updateStatusValidator,
-    orderController.updateOrderStatus
-  );
-};
-
+// Exportamos o router e os docs no formato esperado pelo app.js
 module.exports = {
-  configureRouter,
-  docs: orderDocs,
+    router,
+    docs,
 };

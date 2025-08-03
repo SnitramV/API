@@ -1,6 +1,6 @@
-// controllers/botController.js
 const botService = require('../services/botService');
-const { db, admin } = require('../config/firebase');
+const { db } = require('../config/firebase');
+
 const syncGroups = async (req, res) => {
     const result = await botService.syncGroupsToFirestore();
     if (result.success) {
